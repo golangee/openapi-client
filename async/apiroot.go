@@ -28,26 +28,26 @@ func emitApiRoot(f *gen.GoGenFile, doc *v3.Document) (string, error) {
 
 	f.Printf(gen.Comment(doc.Info.Description))
 	rootName := gen.Public(doc.Info.Title + "Service")
-	f.Printf(parentClientStub, rootName, rootName, rootName, rootName, rootName, rootName)
+	f.Printf(parentClientStub, rootName)
 	return rootName, nil
 }
 
-const parentClientStub = `// %s is a basic http client implementation, which provides some reasonable defaults
-type %s struct {
+const parentClientStub = `// %[1]s is a basic http client implementation, which provides some reasonable defaults
+type %[1]s struct {
 	baseURL    *url.URL
 	userAgent  string
 	httpClient *http.Client
 }
 
-// New%s creates a new service instance. If httpClient is nil, the default client is used.
-func New%s(baseURL *url.URL, userAgent string, httpClient *http.Client) *Client {
+// New%[1]s creates a new service instance. If httpClient is nil, the default client is used.
+func New%[1]s(baseURL *url.URL, userAgent string, httpClient *http.Client) *%[1]s {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-	return &Client{baseURL: baseURL, httpClient: httpClient, userAgent: userAgent}
+	return &%[1]s{baseURL: baseURL, httpClient: httpClient, userAgent: userAgent}
 }
 
-func (s *%s) newRequest(ctx context.Context, method, path, contentType, accept string, body io.Reader) (*http.Request, error) {
+func (s *%[1]s) newRequest(ctx context.Context, method, path, contentType, accept string, body io.Reader) (*http.Request, error) {
 	rel := &url.URL{Path: path}
 	u := s.baseURL.ResolveReference(rel)
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
@@ -65,7 +65,7 @@ func (s *%s) newRequest(ctx context.Context, method, path, contentType, accept s
 	return req, nil
 }
 
-func (s *%s) doJson(req *http.Request, v interface{}) (*http.Response, error) {
+func (s *%[1]s) doJson(req *http.Request, v interface{}) (*http.Response, error) {
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return nil, err
