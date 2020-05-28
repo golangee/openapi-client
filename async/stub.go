@@ -15,6 +15,7 @@
 package async
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -30,28 +31,34 @@ type Client struct {
 	httpClient *http.Client
 }
 
-func NewClient(baseURL *url.URL) *Client {
-	return &Client{baseURL: baseURL, httpClient: http.DefaultClient}
+// New%s creates a new service instance. If httpClient is nil, the default client is used.
+func NewClient(baseURL *url.URL, userAgent string, httpClient *http.Client) *Client {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+	return &Client{baseURL: baseURL, httpClient: httpClient, userAgent: userAgent}
 }
 
-func (c *Client) newRequest(method, path, contentType string, body io.Reader) (*http.Request, error) {
+func (s *Client) newRequest(ctx context.Context, method, path, contentType, accept string, body io.Reader) (*http.Request, error) {
 	rel := &url.URL{Path: path}
-	u := c.baseURL.ResolveReference(rel)
-	req, err := http.NewRequest(method, u.String(), body)
+	u := s.baseURL.ResolveReference(rel)
+	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
 	if err != nil {
 		return nil, err
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", contentType)
 	}
-	req.Header.Set("Accept", "application/json")
-	if c.userAgent != "" {
-		req.Header.Set("User-Agent", c.userAgent)
+
+	req.Header.Set("Accept", accept)
+	if s.userAgent != "" {
+		req.Header.Set("User-Agent", s.userAgent)
 	}
 	return req, nil
 }
-func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
-	resp, err := c.httpClient.Do(req)
+
+func (s *Client) doJson(req *http.Request, v interface{}) (*http.Response, error) {
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

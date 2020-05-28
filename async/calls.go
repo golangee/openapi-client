@@ -27,6 +27,14 @@ type endpoint struct {
 	op     *v3.Operation
 }
 
+func (e endpoint) contentType() string {
+	return "" //TODO
+}
+
+func (e endpoint) acceptType() string {
+	return "application/json" //TODO
+}
+
 func emitCallGroups(f *gen.GoGenFile, parentType string, doc *v3.Document) error {
 	groups := map[string][]endpoint{}
 	for path, call := range doc.Paths {
@@ -57,6 +65,11 @@ func emitCallGroups(f *gen.GoGenFile, parentType string, doc *v3.Document) error
 }
 
 func emitCallGroup(f *gen.GoGenFile, doc *v3.Document, parentType string, name string, endpoints []endpoint) error {
+	f.Printf("// %s returns the according api group\n", name)
+	f.Printf("func (s *%s) %s() %s{\n", parentType, name, name)
+	f.Printf("return %s{parent:s}\n", name)
+	f.Printf("}\n")
+
 	f.Printf("// %s groups tagged api calls\n", name)
 	f.Printf("type %s struct {\n", name)
 	f.Printf("parent *%s\n", parentType)
@@ -76,10 +89,21 @@ func emitCallGroup(f *gen.GoGenFile, doc *v3.Document, parentType string, name s
 }
 
 func emitSyncCall(f *gen.GoGenFile, doc *v3.Document, receiverTypeName string, ep endpoint) error {
+	resType := pickResponseAndResolveTypeName(doc, ep)
 	f.Printf(gen.Comment(ep.op.Description))
-	f.Printf("func (_self %s) sync%s(_ctx %s) (%s,error){\n", receiverTypeName, methodName(ep), f.ImportName("context", "Context"), pickResponseAndResolveTypeName(doc, ep))
+	f.Printf("func (_self %s) sync%s(_ctx %s) (%s,error){\n", receiverTypeName, methodName(ep), f.ImportName("context", "Context"), resType)
+	f.Printf("var _res %s\n", resType)
 	pathParams := pathParamsToSprintf(ep.path)
-	f.Printf("url := %s(\"%s\",%s)\n", f.ImportName("fmt", "Sprintf"), pathParams.sprintfPath, strings.Join(pathParams.params, ","))
+	f.Printf("path := %s(\"%s\",%s)\n", f.ImportName("fmt", "Sprintf"), pathParams.sprintfPath, strings.Join(pathParams.params, ","))
+	// newRequest(ctx context.Context, method, path, contentType, accept string, body io.Reader) (*http.Request, error)
+	f.Printf("_req,_err := _self.parent.newRequest(_ctx, %s, path, \"%s\",\"%s\",nil)\n", ep.method, ep.contentType(), ep.acceptType())
+	f.Printf("if _err != nil {\n")
+	f.Printf("return _res,_err\n")
+	f.Printf("}\n")
+
+	// doJson(req *http.Request, v interface{}) (*http.Response, error)
+	f.Printf("_,_err =_self.parent.doJson(_req,&_res)\n")
+	f.Printf("return _res,_err\n")
 	f.Printf("}\n")
 	return nil
 }

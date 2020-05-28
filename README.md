@@ -8,3 +8,4 @@ issues generating compilable and correct go code:
 * Cannot be safely used in wasm: typesafe and cancelable callbacks needs still to be written by hand
 * No UUID support
 * generates to many files for something which should never be modified by hand. 
+* ugly to integrate into a versioned *go generate*

@@ -18,6 +18,9 @@ import (
 	"fmt"
 	"github.com/golangee/openapi-client/internal/gen"
 	v3 "github.com/golangee/openapi/v3"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 )
 
 // Options to use for generating a new client
@@ -51,6 +54,16 @@ func Generate(spec []byte, opts Options) error {
 	}
 
 	fmt.Println(file.FormatString())
+
+	dir, err := gen.ModRootDir()
+	if err != nil {
+		return err
+	}
+
+	fname := filepath.Join(dir, opts.TargetDir, "openapiclient.gen.go")
+	if err := ioutil.WriteFile(fname, []byte(file.FormatString()), os.ModePerm); err != nil {
+		return err
+	}
 
 	return nil
 }
