@@ -100,7 +100,11 @@ func (w *GoGenFile) Printf(str string, args ...interface{}) {
 			w.sb.WriteByte(' ')
 		}
 	}
-	w.sb.WriteString(fmt.Sprintf(str, args...))
+	if len(args) == 0 {
+		w.sb.WriteString(str)
+	} else {
+		w.sb.WriteString(fmt.Sprintf(str, args...))
+	}
 	w.newLine = strings.HasSuffix(str, "\n")
 }
 
