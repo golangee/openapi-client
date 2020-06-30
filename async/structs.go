@@ -26,6 +26,9 @@ func emitTypes(f *gen.GoGenFile, doc *v3.Document) error {
 	}
 
 	for _, name := range gen.SortedKeys(doc.Components.Schemas) {
+		if name == "Error" {
+			continue // we ignore our own build-in type
+		}
 		schema := doc.Components.Schemas[name]
 		err := emitType(f, doc, name, schema)
 		if err != nil {
