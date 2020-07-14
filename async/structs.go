@@ -18,9 +18,10 @@ import (
 	"fmt"
 	"github.com/golangee/openapi-client/internal/gen"
 	v3 "github.com/golangee/openapi/v3"
+	"strings"
 )
 
-func emitTypes(f *gen.GoGenFile, doc *v3.Document) error {
+func emitTypes(opts Options, f *gen.GoGenFile, doc *v3.Document) error {
 	if doc.Components == nil {
 		return nil
 	}
@@ -30,7 +31,7 @@ func emitTypes(f *gen.GoGenFile, doc *v3.Document) error {
 			continue // we ignore our own build-in type
 		}
 		schema := doc.Components.Schemas[name]
-		err := emitType(f, doc, name, schema)
+		err := emitType(opts, f, doc, name, schema)
 		if err != nil {
 			return err
 		}
@@ -38,7 +39,13 @@ func emitTypes(f *gen.GoGenFile, doc *v3.Document) error {
 	return nil
 }
 
-func emitType(f *gen.GoGenFile, doc *v3.Document, name string, schema v3.Schema) error {
+func emitType(opts Options, f *gen.GoGenFile, doc *v3.Document, name string, schema v3.Schema) error {
+	for _, v := range opts.UseReferences {
+		if schema.XType != nil && *schema.XType == v {
+			return nil
+		}
+	}
+
 	switch schema.Type {
 	case v3.String:
 		fallthrough
@@ -51,28 +58,28 @@ func emitType(f *gen.GoGenFile, doc *v3.Document, name string, schema v3.Schema)
 	case v3.Array:
 		panic(schema)
 	case v3.Object:
-		return emitStruct(f, doc, name, schema)
+		return emitStruct(opts, f, doc, name, schema)
 	default:
 		panic(schema.Type)
 	}
 	return nil
 }
 
-func emitStruct(f *gen.GoGenFile, doc *v3.Document, name string, schema v3.Schema) error {
+func emitStruct(opts Options, f *gen.GoGenFile, doc *v3.Document, name string, schema v3.Schema) error {
 	f.Printf(gen.Comment(schema.Description))
 	f.Printf("type %s struct{\n", name)
 	f.ShiftRight()
 	for _, fieldName := range gen.SortedKeys(schema.Properties) {
 		field := schema.Properties[fieldName]
 		f.Printf(gen.Comment(field.Description))
-		f.Printf("%s %s\n", gen.Public(fieldName), typeName(doc, field))
+		f.Printf("%s %s\n", gen.Public(fieldName), typeName(opts, f, doc, field))
 	}
 	f.ShiftLeft()
 	f.Printf("}\n\n")
 	return nil
 }
 
-func typeName(doc *v3.Document, schema v3.Schema) string {
+func typeName(opts Options, f *gen.GoGenFile, doc *v3.Document, schema v3.Schema) string {
 	switch schema.Type {
 	case v3.String:
 		return "string"
@@ -83,13 +90,21 @@ func typeName(doc *v3.Document, schema v3.Schema) string {
 	case v3.Boolean:
 		return "bool"
 	case v3.Array:
-		return "[]" + typeName(doc, *schema.Items.Schema)
+		return "[]" + typeName(opts, f, doc, *schema.Items.Schema)
 	case v3.Object:
 		return *schema.Ref
 	default:
 		if schema.Ref != nil {
 			name, schema := doc.ResolveRef(*schema.Ref)
 			if schema != nil {
+
+				for _, v := range opts.UseReferences {
+					if schema.XType != nil && *schema.XType == v {
+						tuple := strings.Split(*schema.XType, "#")
+						return f.ImportName(tuple[0], tuple[1])
+					}
+				}
+
 				return name
 			}
 		}

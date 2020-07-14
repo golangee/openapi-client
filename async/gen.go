@@ -27,6 +27,11 @@ import (
 type Options struct {
 	TargetDir     string
 	TargetPackage string
+	// UseReferences contains names of x-ee.type like github.com/golangee/uuid#UUID will be used instead of generated.
+	// This is especially required for types with a custom serialization format which OpenAPI does not support to
+	// express (like UUIDs which must be either strings (as specified) or byte arrays (as base64) - but the
+	// information that it is indeed a UUID is lost).
+	UseReferences []string
 }
 
 // Generates determines the root of the module and applies the options to generate a new client from the spec.
@@ -38,7 +43,7 @@ func Generate(spec []byte, opts Options) error {
 
 	file := gen.NewGoGenFile(opts.TargetPackage, "openapi-client")
 
-	err = emitTypes(file, doc)
+	err = emitTypes(opts, file, doc)
 	if err != nil {
 		return fmt.Errorf("unable to emit types: %w", err)
 	}
@@ -48,7 +53,7 @@ func Generate(spec []byte, opts Options) error {
 		return fmt.Errorf("unable to emit api root: %w", err)
 	}
 
-	err = emitCallGroups(file, parentType, doc)
+	err = emitCallGroups(opts, file, parentType, doc)
 	if err != nil {
 		return fmt.Errorf("unable to emit call groups: %w", err)
 	}

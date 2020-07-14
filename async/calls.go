@@ -35,7 +35,7 @@ func (e endpoint) acceptType() string {
 	return "application/json" //TODO
 }
 
-func emitCallGroups(f *gen.GoGenFile, parentType string, doc *v3.Document) error {
+func emitCallGroups(opts Options, f *gen.GoGenFile, parentType string, doc *v3.Document) error {
 	groups := map[string][]endpoint{}
 	for path, call := range doc.Paths {
 		for method, op := range call.Map() {
@@ -55,7 +55,7 @@ func emitCallGroups(f *gen.GoGenFile, parentType string, doc *v3.Document) error
 
 	for _, tag := range gen.SortedKeys(groups) {
 		endpoints := groups[tag]
-		err := emitCallGroup(f, doc, parentType, gen.Public(tag)+"Service", endpoints)
+		err := emitCallGroup(opts, f, doc, parentType, gen.Public(tag)+"Service", endpoints)
 		if err != nil {
 			return err
 		}
@@ -64,7 +64,7 @@ func emitCallGroups(f *gen.GoGenFile, parentType string, doc *v3.Document) error
 	return nil
 }
 
-func emitCallGroup(f *gen.GoGenFile, doc *v3.Document, parentType string, name string, endpoints []endpoint) error {
+func emitCallGroup(opts Options, f *gen.GoGenFile, doc *v3.Document, parentType string, name string, endpoints []endpoint) error {
 	f.Printf("// %s returns the according api group\n", name)
 	f.Printf("func (s *%s) %s() %s{\n", parentType, name, name)
 	f.Printf("return %s{parent:s}\n", name)
@@ -75,12 +75,12 @@ func emitCallGroup(f *gen.GoGenFile, doc *v3.Document, parentType string, name s
 	f.Printf("parent *%s\n", parentType)
 	f.Printf("}\n\n")
 	for _, ep := range endpoints {
-		err := emitSyncCall(f, doc, name, ep)
+		err := emitSyncCall(opts, f, doc, name, ep)
 		if err != nil {
 			return err
 		}
 
-		err = emitAsyncCall(f, doc, name, ep)
+		err = emitAsyncCall(opts, f, doc, name, ep)
 		if err != nil {
 			return err
 		}
@@ -88,8 +88,8 @@ func emitCallGroup(f *gen.GoGenFile, doc *v3.Document, parentType string, name s
 	return nil
 }
 
-func emitSyncCall(f *gen.GoGenFile, doc *v3.Document, receiverTypeName string, ep endpoint) error {
-	resType := pickResponseAndResolveTypeName(doc, ep)
+func emitSyncCall(opts Options, f *gen.GoGenFile, doc *v3.Document, receiverTypeName string, ep endpoint) error {
+	resType := pickResponseAndResolveTypeName(opts, f, doc, ep)
 	f.Printf(gen.Comment(ep.op.Description))
 	f.Printf("func (_self %s) sync%s(_ctx %s) (%s,error){\n", receiverTypeName, methodName(ep), f.ImportName("context", "Context"), resType)
 	f.Printf("var _res %s\n", resType)
@@ -108,9 +108,9 @@ func emitSyncCall(f *gen.GoGenFile, doc *v3.Document, receiverTypeName string, e
 	return nil
 }
 
-func emitAsyncCall(f *gen.GoGenFile, doc *v3.Document, receiverTypeName string, ep endpoint) error {
+func emitAsyncCall(opts Options, f *gen.GoGenFile, doc *v3.Document, receiverTypeName string, ep endpoint) error {
 	f.Printf(gen.Comment(ep.op.Description))
-	f.Printf("func (_self %s) %s(_ctx %s, f func(res %s,err error)){\n", receiverTypeName, methodName(ep), f.ImportName("context", "Context"), pickResponseAndResolveTypeName(doc, ep))
+	f.Printf("func (_self %s) %s(_ctx %s, f func(res %s,err error)){\n", receiverTypeName, methodName(ep), f.ImportName("context", "Context"), pickResponseAndResolveTypeName(opts, f, doc, ep))
 	f.Printf("go func(){\n")
 	f.Printf("res,err := %s(_ctx)\n", "_self.sync"+methodName(ep))
 	f.Printf("f(res,err)\n")
@@ -134,12 +134,12 @@ func methodName(ep endpoint) string {
 	return gen.SlashToCamelCase(method + "/" + path)
 }
 
-func pickResponseAndResolveTypeName(doc *v3.Document, ep endpoint) string {
+func pickResponseAndResolveTypeName(opts Options, f *gen.GoGenFile, doc *v3.Document, ep endpoint) string {
 	response, has200 := ep.op.Responses["200"]
 	if has200 {
 		json, hasJson := response.Content["application/json"]
 		if hasJson {
-			return typeName(doc, json.Schema)
+			return typeName(opts, f, doc, json.Schema)
 		}
 	}
 	return "interface{}"
