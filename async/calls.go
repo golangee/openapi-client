@@ -91,10 +91,29 @@ func emitCallGroup(opts Options, f *gen.GoGenFile, doc *v3.Document, parentType 
 func emitSyncCall(opts Options, f *gen.GoGenFile, doc *v3.Document, receiverTypeName string, ep endpoint) error {
 	resType := pickResponseAndResolveTypeName(opts, f, doc, ep)
 	f.Printf(gen.Comment(ep.op.Description))
-	f.Printf("func (_self %s) sync%s(_ctx %s) (%s,error){\n", receiverTypeName, methodName(ep), f.ImportName("context", "Context"), resType)
+	f.Printf("func (_self %s) sync%s(_ctx %s", receiverTypeName, methodName(ep), f.ImportName("context", "Context"))
+	for _, inParam := range ep.op.Parameters {
+		tname := typeName(opts, f, doc, inParam.Schema)
+		f.Printf(",%s %s", inParam.Name, tname)
+	}
+	f.Printf(",) (%s,error){\n", resType)
+
 	f.Printf("var _res %s\n", resType)
 	pathParams := pathParamsToSprintf(ep.path)
+
+	query := "?"
+	escapeParams := ""
+	for _, inParam := range ep.op.Parameters {
+		if inParam.In == v3.QueryLocation {
+			query += "&" + inParam.Name + "=%s"
+			imp := f.ImportName("net/url", "QueryEscape")
+			printf := f.ImportName("fmt", "Sprintf")
+			escapeParams += imp + "(" + printf + "(\"%v\"," + inParam.Name + "))"
+		}
+	}
+
 	f.Printf("path := %s(\"%s\",%s)\n", f.ImportName("fmt", "Sprintf"), pathParams.sprintfPath, strings.Join(pathParams.params, ","))
+	f.Printf("path += %s(\"%s\",%s)\n", f.ImportName("fmt", "Sprintf"), query, escapeParams)
 	// newRequest(ctx context.Context, method, path, contentType, accept string, body io.Reader) (*http.Request, error)
 	f.Printf("_req,_err := _self.parent.newRequest(_ctx, \"%s\", path, \"%s\",\"%s\",nil)\n", ep.method, ep.contentType(), ep.acceptType())
 	f.Printf("if _err != nil {\n")
@@ -110,9 +129,19 @@ func emitSyncCall(opts Options, f *gen.GoGenFile, doc *v3.Document, receiverType
 
 func emitAsyncCall(opts Options, f *gen.GoGenFile, doc *v3.Document, receiverTypeName string, ep endpoint) error {
 	f.Printf(gen.Comment(ep.op.Description))
-	f.Printf("func (_self %s) %s(_ctx %s, f func(res %s,err error)){\n", receiverTypeName, methodName(ep), f.ImportName("context", "Context"), pickResponseAndResolveTypeName(opts, f, doc, ep))
+	f.Printf("func (_self %s) %s(_ctx %s, ", receiverTypeName, methodName(ep), f.ImportName("context", "Context"))
+	for _, inParam := range ep.op.Parameters {
+		tname := typeName(opts, f, doc, inParam.Schema)
+		f.Printf("%s %s,", inParam.Name, tname)
+	}
+	f.Printf("f func(res %s,err error)){\n", pickResponseAndResolveTypeName(opts, f, doc, ep))
 	f.Printf("go func(){\n")
-	f.Printf("res,err := %s(_ctx)\n", "_self.sync"+methodName(ep))
+	f.Printf("res,err := %s(_ctx", "_self.sync"+methodName(ep))
+	for _, inParam := range ep.op.Parameters {
+		f.Printf(",")
+		f.Printf(inParam.Name)
+	}
+	f.Printf(")\n")
 	f.Printf("f(res,err)\n")
 	f.Printf("}()\n")
 	f.Printf("}\n")
