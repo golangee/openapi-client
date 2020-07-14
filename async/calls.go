@@ -108,7 +108,7 @@ func emitSyncCall(opts Options, f *gen.GoGenFile, doc *v3.Document, receiverType
 			query += "&" + inParam.Name + "=%s"
 			imp := f.ImportName("net/url", "QueryEscape")
 			printf := f.ImportName("fmt", "Sprintf")
-			escapeParams += imp + "(" + printf + "(\"%v\"," + inParam.Name + "))"
+			escapeParams += imp + "(" + printf + "(\"%v\"," + inParam.Name + ")),"
 		}
 	}
 
